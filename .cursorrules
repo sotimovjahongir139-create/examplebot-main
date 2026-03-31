@@ -1,0 +1,13 @@
+This repository is an aiogram boilerplate for team reuse.
+
+Rules:
+- Main rules are in docs/AI_INSTRUCTIONS.md — read it first.
+- Never create new folders or files outside the existing structure without explaining why first.
+- Keep handlers thin — no logic, only Telegram I/O.
+- Keep business logic in services/.
+- Keep all queries in bot/db/repos.py.
+- Never assume a specific database — DB config comes from DATABASE_URL in settings only.
+- Never hardcode user-facing strings outside bot/strings/.
+- Never build keyboards or buttons inside handlers — use bot/ui/.
+- Prefer flat, pragmatic code over extra abstraction.
+- Add tests for every service, handler, and DB behavior.
