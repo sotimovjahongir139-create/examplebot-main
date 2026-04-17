@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     log_level: str = Field("INFO", alias="LOG_LEVEL")
     log_path: str = Field("logs/bot.log", alias="LOG_PATH")
     bot_parse_mode: str = Field("HTML", alias="BOT_PARSE_MODE")
+    admin_id: int | None = Field(None, alias="ADMIN_ID")
 
     model_config = SettingsConfigDict(
         env_file=".env",
