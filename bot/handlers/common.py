@@ -55,6 +55,12 @@ async def start_handler(message: Message, session: AsyncSession, command: Comman
     await message.answer(text, reply_markup=main_menu_keyboard(user.language_code))
 
 
+@router.message(Command("myid"))
+async def myid_handler(message: Message) -> None:
+    if message.from_user:
+        await message.answer(f"Your Telegram ID: <code>{message.from_user.id}</code>")
+
+
 @router.message(Command("help"))
 async def help_handler(message: Message) -> None:
     settings = get_settings()
