@@ -1,12 +1,19 @@
 import asyncio
+from datetime import datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command
+from aiogram.filters.command import CommandObject
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import bot.state as bot_state
 from bot.config import get_settings
-from bot.services.dashboard import build_dashboard_text, build_user_dashboard_text
+from bot.services.dashboard import (
+    build_admin_monthly_dashboard,
+    build_dashboard_text,
+    build_user_dashboard_text,
+)
 from bot.services.message_processing import (
     ensure_visible_fallback_table,
     export_to_excel,
@@ -25,7 +32,12 @@ router = Router(name="common")
 
 
 @router.message(Command("start"))
-async def start_handler(message: Message, session: AsyncSession) -> None:
+async def start_handler(message: Message, session: AsyncSession, command: CommandObject) -> None:
+    # Deep-link: /start rate_{message_id}  — anyone can open and rate
+    if command.args and command.args.startswith("rate_"):
+        await message.answer("Xizmatni baholang 👇", reply_markup=rating_keyboard())
+        return
+
     settings = get_settings()
     user = await get_or_create_user(
         session=session,
@@ -63,6 +75,19 @@ async def dashboard_handler(message: Message) -> None:
     await message.answer(text)
 
 
+@router.message(Command("admin_dashboard"))
+async def admin_dashboard_handler(message: Message) -> None:
+    if message.from_user is None:
+        return
+    settings = get_settings()
+    if settings.admin_id is None or message.from_user.id != settings.admin_id:
+        await message.answer("Bu buyruq faqat admin uchun.")
+        return
+    now = datetime.now()
+    text = await build_admin_monthly_dashboard(now.year, now.month)
+    await message.answer(text)
+
+
 @router.message(F.text.startswith("/"))
 async def unknown_command_handler(message: Message) -> None:
     settings = get_settings()
@@ -93,7 +118,13 @@ async def _process_and_rate(message: Message, session: AsyncSession) -> None:
         logger.warning(f"Excel export failed: {exc}")
 
     await asyncio.sleep(1)
-    await message.answer("Xizmatni baholang 👇", reply_markup=rating_keyboard())
+
+    link = f"https://t.me/{bot_state.bot_username}?start=rate_{result.message_id}"
+    rating_text = (
+        f'🔗 <a href="{link}">Xizmatni baholang</a>\n\n'
+        f"Xizmatni baholang 👇"
+    )
+    await message.answer(rating_text, reply_markup=rating_keyboard())
 
 
 @router.message(F.text)

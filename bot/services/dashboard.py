@@ -1,6 +1,7 @@
+import calendar
 from datetime import datetime, timedelta
 
-from database import get_daily_breakdown, get_user_ratings, get_weekly_stats
+from database import get_daily_breakdown, get_monthly_stats, get_user_ratings, get_weekly_stats
 
 _WEEKDAY_NAMES: dict[str, str] = {
     "0": "Yakshanba",
@@ -11,6 +12,47 @@ _WEEKDAY_NAMES: dict[str, str] = {
     "5": "Juma",
     "6": "Shanba",
 }
+
+
+_MONTH_NAMES: dict[int, str] = {
+    1: "Yanvar", 2: "Fevral", 3: "Mart", 4: "Aprel",
+    5: "May", 6: "Iyun", 7: "Iyul", 8: "Avgust",
+    9: "Sentabr", 10: "Oktabr", 11: "Noyabr", 12: "Dekabr",
+}
+
+
+async def build_admin_monthly_dashboard(year: int, month: int) -> str:
+    try:
+        data = await get_monthly_stats(year, month)
+    except Exception:
+        return "📊 Oylik hisobot\n\nXatolik yuz berdi."
+
+    month_name = _MONTH_NAMES.get(month, str(month))
+    last_day = calendar.monthrange(year, month)[1]
+    date_range = f"01.{month:02d} – {last_day:02d}.{month:02d}"
+
+    if data["total"] == 0:
+        return f"📊 {month_name} {year} hisoboti ({date_range})\n\nMa'lumot yo'q."
+
+    lines = [
+        f"📊 {month_name} {year} hisoboti ({date_range})",
+        "",
+        f"👥 Jami foydalanuvchilar: {data['unique_users']} (unique, faqat bu oyda xabar yozganlar)",
+        "",
+        "⭐ Baholar taqsimoti:",
+    ]
+
+    breakdown_map = {r["rating"]: r["cnt"] for r in data["breakdown"]}
+    for star in range(5, 0, -1):
+        cnt = breakdown_map.get(star, 0)
+        lines.append(f"★{star} — {cnt} ta foydalanuvchi")
+
+    lines += [
+        "",
+        f"📝 Jami baholar: {data['total']} ta",
+        f"⭐ O'rtacha baho: {data['avg']:.1f} / 5.0",
+    ]
+    return "\n".join(lines)
 
 
 async def build_user_dashboard_text(user_id: int) -> str:
