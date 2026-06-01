@@ -1,44 +1,32 @@
 import asyncio
-import uuid
 
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.filters.command import CommandObject
-from aiogram.types import BufferedInputFile, CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import bot.state as bot_state
 from bot.config import get_settings
-from bot.services.dashboard import build_dashboard_text
-from bot.services.message_processing import process_owner_message
+from bot.services.dashboard import build_dashboard_text, build_user_dashboard_text
+from bot.services.message_processing import (
+    ensure_visible_fallback_table,
+    export_to_excel,
+    parse_business_table,
+    process_owner_message,
+)
 from bot.services.user import get_or_create_user
 from bot.strings import get_text
-from bot.strings.keys import (
-    HELP,
-    PROCESSING_DONE,
-    UNKNOWN_COMMAND,
-    WELCOME,
-)
+from bot.strings.keys import HELP, UNKNOWN_COMMAND, WELCOME
 from bot.ui.inline import rating_keyboard
 from bot.ui.reply import main_menu_keyboard
-from database import create_pending_rating, get_pending_rating, mark_rating_used, save_rating
+from bot.utils.logger import logger
+from database import save_rating
 
 router = Router(name="common")
 
 
 @router.message(Command("start"))
-async def start_handler(message: Message, session: AsyncSession, command: CommandObject) -> None:
-    # Deep-link flow: /start rate_<token>
-    if command.args and command.args.startswith("rate_"):
-        token = command.args[len("rate_"):]
-        pending = await get_pending_rating(token)
-        if pending is None or pending["used"]:
-            await message.answer("Bu havola allaqachon ishlatilgan ❌")
-            return
-        await message.answer("Xizmatimizni baholang 👇", reply_markup=rating_keyboard(token))
-        return
-
-    # Normal /start
+async def start_handler(message: Message, session: AsyncSession) -> None:
+    settings = get_settings()
     user = await get_or_create_user(
         session=session,
         telegram_id=message.from_user.id,
@@ -49,7 +37,7 @@ async def start_handler(message: Message, session: AsyncSession, command: Comman
     )
     text = get_text(
         WELCOME,
-        lang=user.language_code or get_settings().default_language,
+        lang=user.language_code or settings.default_language,
         name=user.first_name or "there",
     )
     await message.answer(text, reply_markup=main_menu_keyboard(user.language_code))
@@ -65,11 +53,13 @@ async def help_handler(message: Message) -> None:
 
 @router.message(Command("dashboard"))
 async def dashboard_handler(message: Message) -> None:
-    settings = get_settings()
-    if settings.admin_id is None or message.from_user is None or message.from_user.id != settings.admin_id:
-        await message.answer("Bu buyruq faqat admin uchun.")
+    if message.from_user is None:
         return
-    text = await build_dashboard_text()
+    settings = get_settings()
+    if settings.admin_id is not None and message.from_user.id == settings.admin_id:
+        text = await build_dashboard_text()
+    else:
+        text = await build_user_dashboard_text(message.from_user.id)
     await message.answer(text)
 
 
@@ -94,21 +84,16 @@ async def _process_and_rate(message: Message, session: AsyncSession) -> None:
         original_text=text_content,
         language_code=user_lang,
     )
-    caption = get_text(
-        PROCESSING_DONE,
-        lang=user_lang,
-        message_id=result.message_id,
-        date=result.send_date_mmddyyyy,
-    )
-    image_file = BufferedInputFile(result.table_image_bytes, filename=f"message_{result.message_id}.png")
-    await message.answer_photo(photo=image_file, caption=caption)
 
-    token = uuid.uuid4().hex
-    await create_pending_rating(token)
+    try:
+        parsed = parse_business_table(result.corrected_text or result.original_text)
+        parsed = ensure_visible_fallback_table(parsed, result.corrected_text or result.original_text)
+        export_to_excel(parsed, result.message_id, result.send_date_mmddyyyy)
+    except Exception as exc:
+        logger.warning(f"Excel export failed: {exc}")
 
     await asyncio.sleep(1)
-    link = f"t.me/{bot_state.bot_username}?start=rate_{token}"
-    await message.answer(f"Xizmatni baholang: {link}")
+    await message.answer("Xizmatni baholang 👇", reply_markup=rating_keyboard())
 
 
 @router.message(F.text)
@@ -127,36 +112,36 @@ async def rating_callback_handler(callback: CallbackQuery) -> None:
         await callback.answer()
         return
 
-    # callback_data format: "rate_<N>:<token>"
-    parts = callback.data.split(":", 1)
-    if len(parts) != 2:
-        await callback.answer()
-        return
-
     try:
-        rating = int(parts[0].split("_")[1])
+        rating = int(callback.data.split("_")[1])
     except (IndexError, ValueError):
         await callback.answer()
         return
 
-    token = parts[1]
-    pending = await get_pending_rating(token)
-    if pending is None or pending["used"]:
-        await callback.answer("Bu havola allaqachon ishlatilgan ❌", show_alert=True)
+    if rating < 1 or rating > 5:
+        await callback.answer()
         return
 
-    await mark_rating_used(token)
-    await save_rating(
-        user_id=callback.from_user.id,
-        username=callback.from_user.username,
-        first_name=callback.from_user.first_name,
-        rating=rating,
-    )
+    try:
+        await save_rating(
+            user_id=callback.from_user.id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name,
+            rating=rating,
+        )
+    except Exception as exc:
+        logger.error(f"save_rating failed: {exc}")
+        await callback.answer("Xatolik yuz berdi ❌", show_alert=True)
+        return
 
     if callback.message is not None:
         try:
             await callback.message.edit_reply_markup(reply_markup=None)
         except Exception:
             pass
+        try:
+            await callback.message.answer("Rahmat! Bahoingiz qabul qilindi ✅")
+        except Exception:
+            pass
 
-    await callback.answer("Rahmat! Bahoingiz qabul qilindi ✅", show_alert=True)
+    await callback.answer()

@@ -85,6 +85,17 @@ async def get_weekly_stats() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def get_user_ratings(user_id: int) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM ratings WHERE user_id = ? ORDER BY rated_at DESC LIMIT 20",
+            (str(user_id),),
+        )
+        rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_daily_breakdown() -> list[dict]:
     cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
     async with aiosqlite.connect(DB_PATH) as db:

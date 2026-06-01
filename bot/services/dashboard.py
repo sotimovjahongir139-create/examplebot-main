@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from database import get_daily_breakdown, get_weekly_stats
+from database import get_daily_breakdown, get_user_ratings, get_weekly_stats
 
 _WEEKDAY_NAMES: dict[str, str] = {
     "0": "Yakshanba",
@@ -13,12 +13,51 @@ _WEEKDAY_NAMES: dict[str, str] = {
 }
 
 
-async def build_dashboard_text() -> str:
-    rows = await get_weekly_stats()
-    daily = await get_daily_breakdown()
+async def build_user_dashboard_text(user_id: int) -> str:
+    try:
+        rows = await get_user_ratings(user_id)
+    except Exception:
+        return "📊 Sizning baholash statistikangiz\n\nXatolik yuz berdi."
 
     if not rows:
-        return "📊 Haftalik hisobot (last 7 days)\n\nMa'lumot yo'q."
+        return "📊 Sizning baholash statistikangiz\n\nHali baho bermagansiz."
+
+    total = len(rows)
+    avg = sum(r["rating"] for r in rows) / total
+
+    lines = [
+        "📊 Sizning baholash statistikangiz",
+        "",
+        f"⭐ O'rtacha baho: {avg:.1f} / 5.0",
+        f"📝 Jami baholar: {total} ta",
+        "",
+        "📈 So'nggi baholar:",
+    ]
+
+    for r in rows[:10]:
+        try:
+            dt = datetime.strptime(r["rated_at"], "%Y-%m-%d %H:%M:%S")
+            dt_str = dt.strftime("%d.%m.%Y")
+        except (ValueError, TypeError):
+            dt_str = str(r["rated_at"])[:10]
+        lines.append(f"- [{dt_str}] ⭐{r['rating']}")
+
+    return "\n".join(lines)
+
+
+async def build_dashboard_text() -> str:
+    try:
+        rows = await get_weekly_stats()
+        daily = await get_daily_breakdown()
+    except Exception:
+        return "📊 Haftalik hisobot\n\nXatolik yuz berdi."
+
+    now = datetime.now()
+    week_start = now - timedelta(days=6)
+    date_range = f"{week_start.strftime('%d.%m')} – {now.strftime('%d.%m')}"
+
+    if not rows:
+        return f"📊 Haftalik hisobot ({date_range})\n\nMa'lumot yo'q."
 
     total = len(rows)
     avg = sum(r["rating"] for r in rows) / total
@@ -27,7 +66,7 @@ async def build_dashboard_text() -> str:
     negative = sum(1 for r in rows if r["rating"] <= 2)
 
     lines = [
-        "📊 Haftalik hisobot (last 7 days)",
+        f"📊 Haftalik hisobot ({date_range})",
         "",
         f"⭐ O'rtacha baho: {avg:.1f} / 5.0",
         f"📝 Jami baholar: {total} ta",
@@ -36,7 +75,7 @@ async def build_dashboard_text() -> str:
     if daily:
         busiest = max(daily, key=lambda x: x["count"])
         day_name = _WEEKDAY_NAMES.get(busiest["weekday_num"], busiest["day"])
-        lines.append(f"📅 Eng faol kun: {day_name} ({busiest['count']} ta baho)")
+        lines.append(f"📅 Eng faol kun: {day_name} ({busiest['count']} ta)")
 
     lines += ["", "📈 Kunlik taqsimot:"]
 
@@ -53,21 +92,9 @@ async def build_dashboard_text() -> str:
 
     lines += [
         "",
-        f"😊 Ijobiy (4-5 ⭐): {positive} ta ({pct_pos}%)",
+        f"😊 Ijobiy (4–5 ⭐): {positive} ta ({pct_pos}%)",
         f"😐 O'rta  (3 ⭐):   {medium} ta ({pct_med}%)",
-        f"😟 Salbiy (1-2 ⭐): {negative} ta ({pct_neg}%)",
+        f"😟 Salbiy (1–2 ⭐): {negative} ta ({pct_neg}%)",
     ]
-
-    bad_rows = [r for r in rows if r["rating"] <= 2]
-    if bad_rows:
-        lines += ["", "Salbiy baholar:"]
-        for r in bad_rows[-10:]:
-            try:
-                dt = datetime.strptime(r["rated_at"], "%Y-%m-%d %H:%M:%S")
-                dt_str = dt.strftime("%d.%m %H:%M")
-            except (ValueError, TypeError):
-                dt_str = str(r["rated_at"])[:16]
-            username = f"@{r['username']}" if r["username"] else r["first_name"] or "Unknown"
-            lines.append(f"- {dt_str} — {username} — ⭐{r['rating']}")
 
     return "\n".join(lines)

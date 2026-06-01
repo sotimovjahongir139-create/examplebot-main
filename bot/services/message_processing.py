@@ -1,8 +1,10 @@
+import os
 import re
 from dataclasses import dataclass
 from datetime import date
 from io import BytesIO
 
+import openpyxl
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -307,6 +309,20 @@ def render_business_table_image(
     buffer = BytesIO()
     image.save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+def export_to_excel(parsed: ParsedBusinessTable, message_id: int, date_str: str) -> str:
+    os.makedirs("exports", exist_ok=True)
+    safe_date = date_str.replace("/", "-")
+    filepath = f"exports/message_{message_id}_{safe_date}.xlsx"
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Report"
+    ws.append(["Model", "Rang", "Soni", "Narxi", "Summa"])
+    for row in list(parsed.rows) + list(parsed.summary_rows):
+        ws.append([row.model, row.rang, row.soni, row.narxi, row.summa])
+    wb.save(filepath)
+    return filepath
 
 
 async def process_owner_message(
