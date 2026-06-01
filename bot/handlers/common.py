@@ -35,7 +35,12 @@ router = Router(name="common")
 async def start_handler(message: Message, session: AsyncSession, command: CommandObject) -> None:
     # Deep-link: /start rate_{message_id}  — anyone can open and rate
     if command.args and command.args.startswith("rate_"):
-        await message.answer("Xizmatni baholang 👇", reply_markup=rating_keyboard())
+        await message.answer(
+            "Ishonch bildirganingiz uchun rahmat! 🙌\n"
+            "Sizga xizmat ko'rsatgan mutaxassis ishini baholang\n"
+            "Fikringiz xizmat sifatini yanada yaxshilashga yordam beradi 👇",
+            reply_markup=rating_keyboard(),
+        )
         return
 
     settings = get_settings()
@@ -127,8 +132,10 @@ async def _process_and_rate(message: Message, session: AsyncSession) -> None:
 
     link = f"https://t.me/{bot_state.bot_username}?start=rate_{result.message_id}"
     rating_text = (
-        f'🔗 <a href="{link}">Xizmatni baholang</a>\n\n'
-        f"Xizmatni baholang 👇"
+        f'🔗 <a href="{link}">⭐ Baholash</a>\n\n'
+        f"Ishonch bildirganingiz uchun rahmat! 🙌\n"
+        f"Sizga xizmat ko'rsatgan mutaxassis ishini baholang\n"
+        f"Fikringiz xizmat sifatini yanada yaxshilashga yordam beradi 👇"
     )
     await message.answer(rating_text, reply_markup=rating_keyboard())
 
