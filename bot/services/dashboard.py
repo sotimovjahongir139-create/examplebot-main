@@ -1,7 +1,7 @@
 import calendar
 from datetime import datetime, timedelta
 
-from database import get_daily_breakdown, get_monthly_stats, get_user_ratings, get_weekly_stats
+from database import get_daily_breakdown, get_monthly_raters, get_monthly_stats, get_user_ratings, get_weekly_stats
 
 _WEEKDAY_NAMES: dict[str, str] = {
     "0": "Yakshanba",
@@ -24,6 +24,7 @@ _MONTH_NAMES: dict[int, str] = {
 async def build_admin_monthly_dashboard(year: int, month: int) -> str:
     try:
         data = await get_monthly_stats(year, month)
+        raters = await get_monthly_raters(year, month)
     except Exception:
         return "📊 Oylik hisobot\n\nXatolik yuz berdi."
 
@@ -51,7 +52,17 @@ async def build_admin_monthly_dashboard(year: int, month: int) -> str:
         "",
         f"📝 Jami baholar: {data['total']} ta",
         f"⭐ O'rtacha baho: {data['avg']:.1f} / 5.0",
+        "",
+        "📋 Batafsil:",
     ]
+
+    for star in range(5, 0, -1):
+        users = raters.get(star, [])
+        if users:
+            lines.append(f"★{star}: {', '.join(users)}")
+        else:
+            lines.append(f"★{star} — yo'q")
+
     return "\n".join(lines)
 
 

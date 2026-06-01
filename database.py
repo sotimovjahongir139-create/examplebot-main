@@ -122,6 +122,27 @@ async def get_monthly_stats(year: int, month: int) -> dict:
     return {"unique_users": unique_users, "breakdown": breakdown, "total": total, "avg": avg}
 
 
+async def get_monthly_raters(year: int, month: int) -> dict[int, list[str]]:
+    """Returns {star: [display_name, ...]} for every rating in the given month."""
+    y_str = str(year)
+    m_str = f"{month:02d}"
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT rating, username, user_id FROM ratings"
+            " WHERE strftime('%Y', rated_at) = ? AND strftime('%m', rated_at) = ?"
+            " ORDER BY rating DESC, rated_at",
+            (y_str, m_str),
+        )
+        rows = [dict(r) for r in await cursor.fetchall()]
+
+    result: dict[int, list[str]] = {5: [], 4: [], 3: [], 2: [], 1: []}
+    for r in rows:
+        name = f"@{r['username']}" if r["username"] else f"id:{r['user_id']}"
+        result[r["rating"]].append(name)
+    return result
+
+
 async def get_daily_breakdown() -> list[dict]:
     cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
     async with aiosqlite.connect(DB_PATH) as db:
