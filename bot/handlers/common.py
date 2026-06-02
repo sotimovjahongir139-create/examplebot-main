@@ -37,7 +37,7 @@ async def start_handler(message: Message, session: AsyncSession, command: Comman
     if command.args and command.args.startswith("rate_"):
         await message.answer(
             "Ishonch bildirganingiz uchun rahmat! 🙌\n"
-            "Sizga xizmat ko'rsatgan mutaxassis ishini baholang\n"
+            "Sizga xizmat ko'rsatgan hodimimiz ishini baholang\n"
             "Fikringiz xizmat sifatini yanada yaxshilashga yordam beradi 👇",
             reply_markup=rating_keyboard(),
         )
@@ -134,7 +134,7 @@ async def _process_and_rate(message: Message, session: AsyncSession) -> None:
     rating_text = (
         f'🔗 <a href="{link}">⭐ Baholash</a>\n\n'
         f"Ishonch bildirganingiz uchun rahmat! 🙌\n"
-        f"Sizga xizmat ko'rsatgan mutaxassis ishini baholang\n"
+        f"Sizga xizmat ko'rsatgan hodimimiz ishini baholang\n"
         f"Fikringiz xizmat sifatini yanada yaxshilashga yordam beradi 👇"
     )
     await message.answer(rating_text, reply_markup=rating_keyboard())
