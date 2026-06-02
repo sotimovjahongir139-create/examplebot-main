@@ -73,3 +73,7 @@ pytest
 
 - `docker-compose.yml` is intended for local containerized development.
 - `docker-compose.prod.yml` includes PostgreSQL and restart policies for production-style setups.
+
+## Auto-deploy
+
+Pushes to `main` are deployed to the server automatically within ~5 min (poll-based) and reported to Telegram `@johnupdatebot`.
