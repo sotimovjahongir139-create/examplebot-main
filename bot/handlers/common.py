@@ -88,12 +88,6 @@ async def dashboard_handler(message: Message) -> None:
 
 @router.message(Command("admin_dashboard"))
 async def admin_dashboard_handler(message: Message) -> None:
-    if message.from_user is None:
-        return
-    settings = get_settings()
-    if settings.admin_id is None or message.from_user.id != settings.admin_id:
-        await message.answer("Bu buyruq faqat admin uchun.")
-        return
     now = datetime.now()
     text = await build_admin_monthly_dashboard(now.year, now.month)
     await message.answer(text)
