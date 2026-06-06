@@ -129,7 +129,9 @@ async def _process_and_rate(message: Message, session: AsyncSession) -> None:
         f'🔗 <a href="{link}">⭐ Baholash</a>\n\n'
         f"Ishonch bildirganingiz uchun rahmat! 🙌\n"
         f"Sizga xizmat ko'rsatgan hodimimiz ishini baholang\n"
-        f"Fikringiz xizmat sifatini yanada yaxshilashga yordam beradi 👇"
+        f"Fikringiz xizmat sifatini yanada yaxshilashga yordam beradi 👇\n\n"
+        f"🔥 Eksklyuziv chegirmalar, yangi modellar va foydali kontentlar uchun:\n"
+        f"📢 Kanalimizga qo'shiling: @Arkon_tagcharm"
     )
     await message.answer(rating_text, reply_markup=rating_keyboard())
 
